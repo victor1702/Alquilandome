@@ -1,0 +1,172 @@
+﻿@page "/articulos"
+
+@if (!ShowForm)
+{
+    <h3>Articulos (@Items.Count)</h3>
+    <div class="mb-2">
+        <button class="btn btn-success"
+            @onclick="()=>{ShowForm = !ShowForm;}">
+            Agregar
+        </button>
+    </div>
+}
+<div class="container">
+    @if (ShowForm)
+    {
+        <h3>@TituloForm</h3>
+        <EditForm Model="request" OnValidSubmit="Send">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Referencia</label>
+                <InputText class="form-control" @bind-Value="@request.Referencia"></InputText>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Descripción</label>
+                <InputText class="form-control" @bind-Value="@request.Descripción"></InputText>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Cantidad</label>
+                <InputNumber class="form-control" @bind-Value="@request.Cantidad"></InputNumber>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Precio/Alquiler</label>
+                <InputNumber class="form-control" @bind-Value="@request.PrecioAlquiler"></InputNumber>
+            </div>
+            
+            <div class="btn-group">
+                <button type="submit" class="btn btn-outline-success">Guardar</button>
+                <button @onclick="Cancelar" class="btn btn-outline-danger">Cancelar</button>
+            </div>
+        </EditForm>
+        <br />
+    }
+    else
+    {
+        <table class="table">
+        <thead>
+            <tr>
+                <th>Referencia</th>
+                <th>Descripción</th>
+                <th>Cantidad</th>
+                <th>Precio/Alquiler</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Items)
+            {
+                <tr>
+                    <td>@item.Referencia</td>
+                    <td>@item.Descripción</td>
+                    <td>@item.Cantidad</td>
+                    <td>@item.PrecioAlquiler</td>
+                    <td>
+                        <div class="group">
+                            <button class="btn btn-warning oi oi-pencil" @onclick="()=>Seleccionar(item.Id)">
+                            </button>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="btn-group" @onclick="()=>Eliminar(item)">
+                            <button class="btn btn-danger oi oi-trash">
+                            </button>
+                        </div>
+                    </td>
+                    
+                </tr>
+            }
+        </tbody>
+    </table>
+    }
+</div>
+@code {
+    public string TituloForm => request.Id == 0 ?
+    "Agregar articulo" : "Modificar articulo";
+
+    public bool ShowForm { get; set; } = false;
+    public string Filtro { get; set; } = "";
+    public List<ArticuloResponse> Items { get; set; }
+        = new List<ArticuloResponse>();
+
+    public ArticuloRequest request { get; set; } = new ArticuloRequest();
+
+    void Cancelar()
+    {
+        request = new ArticuloRequest();
+        ShowForm = false;
+    }
+    async Task CargarArticulos()
+    {
+        var resultado =
+        await articuloServices.Consultar(Filtro);
+        if (resultado.Success)
+        {
+            Items = resultado.Data!;
+        }
+    }
+
+    public void Editar(ArticuloResponse item)
+    {
+        ShowForm = true;
+        request = new ArticuloRequest
+            {
+                Id = item.Id,
+                Referencia = item.Referencia,
+                Descripción = item.Descripción,
+                Cantidad = item.Cantidad,
+                PrecioAlquiler = item.PrecioAlquiler
+            };
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarArticulos();
+    }
+
+    public async Task Send()
+    {
+        if (request.Id == 0)
+        {
+            //Debo registrar el contacto..
+            var r = await articuloServices.Crear(request);
+            if (r.Success)
+            {
+                Cancelar();
+                await CargarArticulos();
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            //Debo solicitar modificar el contacto...
+            var r = await articuloServices.Modificar(request);
+            if (r.Success)
+            {
+                Cancelar();
+                await CargarArticulos();
+                StateHasChanged();
+            }
+        }
+    }
+
+    public void Seleccionar(int Id)
+    {
+        ShowForm = true;
+        request = Items
+        .Where(c => c.Id == Id)
+        .Select(c => c.ToRequest())
+        .FirstOrDefault() ?? new ArticuloRequest();
+    }
+
+    public async Task Eliminar(ArticuloResponse user)
+    {
+        var resultado = await articuloServices.Eliminar(user.ToRequest());
+        if (resultado.Success)
+        {
+            await CargarArticulos();
+            StateHasChanged();
+        } 
+    }
+
+}
